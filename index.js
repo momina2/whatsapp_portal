@@ -31,16 +31,20 @@ app.post("/webhook", async (req, res) => {
 
   const from = msg.from;
 
-  // 🔥 MAIN FIX
-  const action =
+  // ===== FIXED ACTION HANDLING =====
+  let action =
     msg.interactive?.list_reply?.id ||
     msg.interactive?.button_reply?.id ||
-    msg.text?.body?.toLowerCase();
+    msg.text?.body;
+
+  if (action) {
+    action = action.toString().trim().toUpperCase();
+  }
 
   console.log("User action:", action);
 
   /* ===== MAIN MENU ===== */
-  if (action === "hi" || action === "menu") {
+  if (action === "HI" || action === "MENU") {
     return sendMainMenu(from);
   }
 
@@ -61,15 +65,24 @@ app.post("/webhook", async (req, res) => {
 
   /* ===== SERVICE SELECT ===== */
   if (action?.startsWith("SERVICE_")) {
-    bookings[from] = { service: action.replace("SERVICE_", ""), step: "date" };
-    return sendMessage(from, "📅 Please send preferred *date*");
+    bookings[from] = {
+      service: action.replace("SERVICE_", "").replace(/_/g, " "),
+      step: "date",
+    };
+    return sendMessage(
+      from,
+      "📅 Please type your *preferred date*\n(e.g. 5 March 2026)"
+    );
   }
 
   /* ===== DATE ===== */
   if (bookings[from]?.step === "date") {
     bookings[from].date = action;
     bookings[from].step = "location";
-    return sendMessage(from, "📍 Please send your *location*");
+    return sendMessage(
+      from,
+      "📍 Please type your *complete address*\n(Area, City)"
+    );
   }
 
   /* ===== LOCATION ===== */
@@ -85,7 +98,8 @@ app.post("/webhook", async (req, res) => {
 📅 Date: ${date}
 📍 Location: ${action}
 
-Our team will contact you shortly 💚`
+Our team will contact you shortly 💚
+*Kaam Set Hai!*`
     );
   }
 
@@ -95,37 +109,49 @@ Our team will contact you shortly 💚`
 /* ============ MENUS ============ */
 
 async function sendMainMenu(to) {
-  return sendList(to, "👋 *Welcome to Kaam Se Thai*", [
-    { id: "PRICING", title: "💰 Pricing" },
-    { id: "SUPPORT", title: "📞 Contact Support" },
-  ]);
+  return sendList(
+    to,
+    `👋 *Welcome to Kaam Set Hai*
+
+We provide *trusted AC & Solar services* at your doorstep 🏠  
+✔ Skilled technicians  
+✔ Transparent pricing  
+✔ Quick support  
+
+Please choose an option below 👇`,
+    [
+      { id: "PRICING", title: "💰 View Pricing" },
+      { id: "SUPPORT", title: "📞 Contact Support" },
+    ]
+  );
 }
 
 async function sendPricingMenu(to) {
-  return sendList(to, "💰 *Choose Category*", [
+  return sendList(to, "💰 *Choose a Service Category*", [
     { id: "AC_MENU", title: "❄️ AC Services" },
     { id: "SOLAR_MENU", title: "☀️ Solar Services" },
   ]);
 }
 
 async function sendACServices(to) {
-  return sendList(to, "❄️ *AC Services*", [
-    { id: "SERVICE_AC_INSTALL", title: "AC Installation — Rs. 2,500" },
-    { id: "SERVICE_AC_GENERAL", title: "General Service — Rs. 2,500" },
-    { id: "SERVICE_AC_NORMAL", title: "Normal Service — Rs. 1,500" },
+  return sendList(to, "❄️ *AC Services & Pricing*", [
+    { id: "SERVICE_AC_INSTALLATION", title: "AC Installation — Rs. 2,500" },
+    { id: "SERVICE_AC_GENERAL_SERVICE", title: "General Service — Rs. 2,500" },
+    { id: "SERVICE_AC_NORMAL_SERVICE", title: "Normal Service — Rs. 1,500" },
     { id: "SERVICE_AC_REPAIR", title: "Repair (After Inspection)" },
     { id: "SERVICE_AC_PCB", title: "PCB Card (Kit) — Rs. 8,000" },
-    { id: "SERVICE_AC_LEAK", title: "Leakage Repair — Rs. 6,000" },
+    { id: "SERVICE_AC_LEAKAGE", title: "Leakage Repair — Rs. 6,000" },
     { id: "SERVICE_AC_GAS", title: "Gas Refilling — Rs. 8,000" },
     { id: "SERVICE_AC_VISIT", title: "Visit Charges — Rs. 1,000" },
   ]);
 }
+
 async function sendSolarServices(to) {
-  return sendList(to, "☀️ *Solar Services*", [
-    { id: "SERVICE_SOLAR_20", title: "Minimum 20 Plates — Rs. 3,000" },
-    { id: "SERVICE_SOLAR_EXTRA", title: "Additional Plates — Rs. 100 / plate" },
+  return sendList(to, "☀️ *Solar Services & Pricing*", [
+    { id: "SERVICE_SOLAR_20_PLATES", title: "Minimum 20 Plates — Rs. 3,000" },
+    { id: "SERVICE_SOLAR_EXTRA_PLATES", title: "Extra Plates — Rs. 100 / plate" },
     { id: "SERVICE_SOLAR_INVERTER", title: "Inverter Repair (Inspection)" },
-    { id: "SERVICE_SOLAR_INSTALL", title: "Solar Installation (Inspection)" },
+    { id: "SERVICE_SOLAR_INSTALLATION", title: "Solar Installation (Inspection)" },
     { id: "SERVICE_SOLAR_VISIT", title: "Visit Charges — Rs. 1,000" },
   ]);
 }
@@ -173,5 +199,5 @@ async function sendMessage(to, body) {
 
 // ============ SERVER ============
 app.listen(process.env.PORT || 8080, () =>
-  console.log("🚀 Bot running")
+  console.log("🚀 Kaam Set Hai Bot running")
 );
