@@ -39,56 +39,43 @@ app.post("/webhook", async (req, res) => {
 
     console.log("User said:", text || buttonId);
 
-    // ===== SHOW MENU =====
-    if (text === "hi" || text === "menu") {
-      await sendMenu(from);
+    /* ===== MAIN MENU ===== */
+    if (text === "hi" || text === "menu" || buttonId === "BACK_MAIN") {
+      await sendMainMenu(from);
     }
 
-    // ===== MENU BUTTONS =====
+    /* ===== PRICING MENU ===== */
     else if (buttonId === "PRICING") {
-      await sendMessage(
+      await sendPricingMenu(from);
+    }
+
+    /* ===== SOLAR PRICING ===== */
+    else if (buttonId === "SOLAR_PRICE") {
+      bookings[from] = { selectedService: "Solar" };
+      await sendServicePricing(
         from,
-        `💰 *Services & Pricing*
-
-🔧 AC Installation — Rs. 2,500  
-❄ AC General Service — Rs. 2,000  
-🔌 Electrical — Rs. 1,500  
-🚰 Plumbing — Rs. 1,200  
-
-Type *menu* to go back`
+        "☀️ *Solar Services Pricing*\n\n• Solar Installation — Rs. 150,000\n• Solar Maintenance — Rs. 10,000"
       );
     }
 
-    else if (buttonId === "BOOK") {
-      bookings[from] = { step: "name" };
+    /* ===== AC PRICING ===== */
+    else if (buttonId === "AC_PRICE") {
+      bookings[from] = { selectedService: "AC" };
+      await sendServicePricing(
+        from,
+        "❄️ *AC Services Pricing*\n\n• AC Installation — Rs. 2,500\n• AC General Service — Rs. 2,000"
+      );
+    }
+
+    /* ===== START BOOKING FROM PRICING ===== */
+    else if (buttonId === "BOOK_NOW") {
+      bookings[from].step = "name";
       await sendMessage(from, "✍️ Please send your *name*");
     }
 
-    else if (buttonId === "SUPPORT") {
-      await sendMessage(
-        from,
-        `📞 *Support Team*
-WhatsApp: 0326-1761768  
-Email: support@kaamsethai.pk`
-      );
-    }
-
-    // ===== BOOKING FLOW =====
+    /* ===== BOOKING FLOW (UNCHANGED) ===== */
     else if (bookings[from]?.step === "name") {
       bookings[from].name = text;
-      bookings[from].step = "service";
-      await sendMessage(
-        from,
-        `🛠 Which service do you want?
-
-AC  
-Electrical  
-Plumbing`
-      );
-    }
-
-    else if (bookings[from]?.step === "service") {
-      bookings[from].service = text;
       bookings[from].step = "date";
       await sendMessage(from, "📅 Please send preferred *date* (e.g. 5 March)");
     }
@@ -96,20 +83,31 @@ Plumbing`
     else if (bookings[from]?.step === "date") {
       bookings[from].date = text;
 
-      const { name, service, date } = bookings[from];
+      const { name, selectedService, date } = bookings[from];
 
       await sendMessage(
         from,
         `✅ *Booking Confirmed*
 
 👤 Name: ${name}  
-🛠 Service: ${service}  
+🛠 Service: ${selectedService}  
 📅 Date: ${date}
 
 Our team will contact you shortly 💚`
       );
 
       delete bookings[from];
+    }
+
+    /* ===== CONTACT ===== */
+    else if (buttonId === "SUPPORT") {
+      await sendMessage(
+        from,
+        `📞 *Contact & Support*
+
+WhatsApp: 0326-1761768  
+Email: support@kaamsethai.pk`
+      );
     }
 
     else {
@@ -123,8 +121,46 @@ Our team will contact you shortly 💚`
   }
 });
 
-// ================= SEND MENU =================
-async function sendMenu(to) {
+/* ================= MAIN MENU ================= */
+async function sendMainMenu(to) {
+  await sendList(
+    to,
+    "👋 Welcome to *Kaam Se Thai*\nChoose an option 👇",
+    [
+      { id: "PRICING", title: "💰 Pricing" },
+      { id: "BOOK_NOW", title: "📅 Book Service" },
+      { id: "SUPPORT", title: "📞 Contact & Support" },
+    ]
+  );
+}
+
+/* ================= PRICING MENU ================= */
+async function sendPricingMenu(to) {
+  await sendList(
+    to,
+    "💰 Select a service category",
+    [
+      { id: "SOLAR_PRICE", title: "☀️ Solar Services" },
+      { id: "AC_PRICE", title: "❄️ AC Services" },
+      { id: "BACK_MAIN", title: "⬅ Back to Main Menu" },
+    ]
+  );
+}
+
+/* ================= SERVICE PRICING ================= */
+async function sendServicePricing(to, text) {
+  await sendList(
+    to,
+    text,
+    [
+      { id: "BOOK_NOW", title: "✅ Book this service" },
+      { id: "BACK_MAIN", title: "⬅ Back to Main Menu" },
+    ]
+  );
+}
+
+/* ================= LIST MESSAGE ================= */
+async function sendList(to, bodyText, rows) {
   await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
     method: "POST",
     headers: {
@@ -137,28 +173,17 @@ async function sendMenu(to) {
       type: "interactive",
       interactive: {
         type: "list",
-        body: {
-          text: "👋 Welcome to *Kaam Se Thai*\nChoose an option 👇",
-        },
+        body: { text: bodyText },
         action: {
-          button: "Open Menu",
-          sections: [
-            {
-              title: "Main Menu",
-              rows: [
-                { id: "PRICING", title: "💰 Services & Pricing" },
-                { id: "BOOK", title: "📅 Book a Service" },
-                { id: "SUPPORT", title: "📞 Contact Support" },
-              ],
-            },
-          ],
+          button: "Select",
+          sections: [{ title: "Options", rows }],
         },
       },
     }),
   });
 }
 
-// ================= SEND TEXT MESSAGE =================
+/* ================= TEXT MESSAGE ================= */
 async function sendMessage(to, body) {
   await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
     method: "POST",
@@ -173,11 +198,9 @@ async function sendMessage(to, body) {
       text: { body },
     }),
   });
-
-  console.log("Auto reply sent");
 }
 
-// ================= SERVER =================
+/* ================= SERVER ================= */
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () =>
   console.log(`🚀 WhatsApp bot running on port ${PORT}`)
