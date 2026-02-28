@@ -110,20 +110,23 @@ async function sendPricingMenu(to) {
 
 async function sendACServices(to) {
   return sendList(to, "❄️ *AC Services*", [
-    { id: "SERVICE_AC Installation - Rs. 2,500", title: "AC Installation" },
-    { id: "SERVICE_General Service - Rs. 2,500", title: "General Service" },
-    { id: "SERVICE_Normal Service - Rs. 1,500", title: "Normal Service" },
-    { id: "SERVICE_Gas Refilling - Rs. 8,000", title: "Gas Refilling" },
-    { id: "SERVICE_Visit Charges - Rs. 1,000", title: "Visit Charges" },
+    { id: "SERVICE_AC_INSTALL", title: "AC Installation — Rs. 2,500" },
+    { id: "SERVICE_AC_GENERAL", title: "General Service — Rs. 2,500" },
+    { id: "SERVICE_AC_NORMAL", title: "Normal Service — Rs. 1,500" },
+    { id: "SERVICE_AC_REPAIR", title: "Repair (After Inspection)" },
+    { id: "SERVICE_AC_PCB", title: "PCB Card (Kit) — Rs. 8,000" },
+    { id: "SERVICE_AC_LEAK", title: "Leakage Repair — Rs. 6,000" },
+    { id: "SERVICE_AC_GAS", title: "Gas Refilling — Rs. 8,000" },
+    { id: "SERVICE_AC_VISIT", title: "Visit Charges — Rs. 1,000" },
   ]);
 }
-
 async function sendSolarServices(to) {
   return sendList(to, "☀️ *Solar Services*", [
-    { id: "SERVICE_Minimum 20 Plates - Rs. 3,000", title: "20 Plates Service" },
-    { id: "SERVICE_Inverter Repair", title: "Inverter Repair" },
-    { id: "SERVICE_Solar Installation", title: "Solar Installation" },
-    { id: "SERVICE_Visit Charges - Rs. 1,000", title: "Visit Charges" },
+    { id: "SERVICE_SOLAR_20", title: "Minimum 20 Plates — Rs. 3,000" },
+    { id: "SERVICE_SOLAR_EXTRA", title: "Additional Plates — Rs. 100 / plate" },
+    { id: "SERVICE_SOLAR_INVERTER", title: "Inverter Repair (Inspection)" },
+    { id: "SERVICE_SOLAR_INSTALL", title: "Solar Installation (Inspection)" },
+    { id: "SERVICE_SOLAR_VISIT", title: "Visit Charges — Rs. 1,000" },
   ]);
 }
 
