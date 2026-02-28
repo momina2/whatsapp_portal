@@ -4,20 +4,15 @@ import fetch from "node-fetch";
 const app = express();
 app.use(express.json());
 
-// ================= ENV =================
+// ===== ENV =====
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
-// ================= SESSION STORE =================
-const sessions = {};
+// ===== BOOKING STATE =====
+const bookings = {};
 
-// ================= HELPERS =================
-function isBookingInProgress(user) {
-  return sessions[user]?.step;
-}
-
-// ================= WEBHOOK VERIFY =================
+// ================= VERIFY =================
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -29,105 +24,74 @@ app.get("/webhook", (req, res) => {
   return res.sendStatus(403);
 });
 
-// ================= RECEIVE MESSAGES =================
+// ================= WEBHOOK =================
 app.post("/webhook", async (req, res) => {
   try {
-    const entry = req.body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const message = changes?.value?.messages?.[0];
+    const msg =
+      req.body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
 
-    if (!message) return res.sendStatus(200);
+    if (!msg) return res.sendStatus(200);
 
-    const from = message.from;
-    const text = message.text?.body?.toLowerCase() || "";
-    const buttonId =
-      message.interactive?.list_reply?.id ||
-      message.interactive?.button_reply?.id;
+    const from = msg.from;
+    const text = msg.text?.body?.toLowerCase();
+    const actionId =
+      msg.interactive?.list_reply?.id ||
+      msg.interactive?.button_reply?.id;
 
-    console.log("User said:", text || buttonId);
+    console.log("User said:", text || actionId);
 
-    // ================= MAIN MENU =================
-    if ((text === "hi" || text === "menu") && !isBookingInProgress(from)) {
-      sessions[from] = {};
+    /* ===== MAIN MENU ===== */
+    if (text === "hi" || text === "menu") {
       await sendMainMenu(from);
     }
 
-    // ================= PRICING MENU =================
-    else if (buttonId === "PRICING" && !isBookingInProgress(from)) {
+    /* ===== PRICING ===== */
+    else if (actionId === "PRICING") {
       await sendPricingMenu(from);
     }
 
-    // ================= CATEGORY =================
-    else if (buttonId === "AC_MENU" && !isBookingInProgress(from)) {
-      sessions[from] = { category: "AC" };
+    /* ===== AC / SOLAR MENU ===== */
+    else if (actionId === "AC_MENU") {
       await sendACServices(from);
     }
 
-    else if (buttonId === "SOLAR_MENU" && !isBookingInProgress(from)) {
-      sessions[from] = { category: "SOLAR" };
+    else if (actionId === "SOLAR_MENU") {
       await sendSolarServices(from);
     }
 
-    // ================= SERVICE SELECTION =================
-    else if (
-      sessions[from]?.category &&
-      !sessions[from]?.step &&
-      /^service_/i.test(buttonId)
-    ) {
-      sessions[from].service = buttonId.replace("SERVICE_", "");
-      sessions[from].step = "date";
+    /* ===== BOOKING START ===== */
+    else if (actionId?.startsWith("SERVICE_")) {
+      bookings[from] = {
+        step: "date",
+        service: actionId.replace("SERVICE_", "")
+      };
 
       await sendMessage(
         from,
-        `📅 *${sessions[from].service}*\n\nPlease send preferred *date* (e.g. 2 March)`
+        `📅 *${bookings[from].service}*\n\nPlease send preferred *date*`
       );
     }
 
-    // ================= DATE =================
-    else if (sessions[from]?.step === "date" && text) {
-      sessions[from].date = text;
-      sessions[from].step = "location";
+    else if (bookings[from]?.step === "date") {
+      bookings[from].date = text;
+      bookings[from].step = "location";
 
-      await sendMessage(
-        from,
-        "📍 Please share your *current location*"
-      );
+      await sendMessage(from, "📍 Please share your *location*");
     }
 
-    // ================= LOCATION =================
-    else if (sessions[from]?.step === "location" && message.location) {
-      const { latitude, longitude } = message.location;
-      sessions[from].location = `${latitude}, ${longitude}`;
-
-      const { category, service, date } = sessions[from];
+    else if (bookings[from]?.step === "location") {
+      const { service, date } = bookings[from];
 
       await sendMessage(
         from,
-        `✅ *Booking Confirmed*
-
-🛠 Category: ${category}  
-🔧 Service: ${service}  
-📅 Date: ${date}  
-📍 Location received
-
-Our team will contact you shortly 💚`
+        `✅ *Booking Confirmed*\n\n🛠 ${service}\n📅 ${date}\n📍 ${text}\n\nOur team will contact you 💚`
       );
 
-      delete sessions[from];
-    }
-
-    // ================= SUPPORT =================
-    else if (buttonId === "SUPPORT" && !isBookingInProgress(from)) {
-      await sendMessage(
-        from,
-        `📞 *Contact & Support*
-WhatsApp: 0326-1761768  
-Email: support@kaamsethai.pk`
-      );
+      delete bookings[from];
     }
 
     else {
-      await sendMessage(from, "❓ Type *menu* to continue");
+      await sendMessage(from, "Type *menu* to continue");
     }
 
     res.sendStatus(200);
@@ -138,15 +102,16 @@ Email: support@kaamsethai.pk`
 });
 
 // ================= MENUS =================
+
 async function sendMainMenu(to) {
-  return sendList(to, "👋 *Welcome to Kaam Se Thai*", [
+  return sendList(to, "👋 Welcome to *Kaam Se Thai*", [
     { id: "PRICING", title: "💰 Pricing" },
-    { id: "SUPPORT", title: "📞 Contact & Support" },
+    { id: "SUPPORT", title: "📞 Contact Support" },
   ]);
 }
 
 async function sendPricingMenu(to) {
-  return sendList(to, "💰 *Choose Category*", [
+  return sendList(to, "Choose service category 👇", [
     { id: "AC_MENU", title: "❄️ AC Services" },
     { id: "SOLAR_MENU", title: "☀️ Solar Services" },
   ]);
@@ -158,24 +123,21 @@ async function sendACServices(to) {
     { id: "SERVICE_General Service", title: "General Service - Rs. 2,500" },
     { id: "SERVICE_Normal Service", title: "Normal Service - Rs. 1,500" },
     { id: "SERVICE_Repair", title: "Repair (After Inspection)" },
-    { id: "SERVICE_PCB Card", title: "PCB Card (Kit) - Rs. 8,000" },
-    { id: "SERVICE_Leakage Repair", title: "Leakage Repair - Rs. 6,000" },
     { id: "SERVICE_Gas Refilling", title: "Gas Refilling - Rs. 8,000" },
-    { id: "SERVICE_Visit Charges", title: "Visit Charges - Rs. 1,000" },
   ]);
 }
 
 async function sendSolarServices(to) {
   return sendList(to, "☀️ *Solar Services*", [
-    { id: "SERVICE_Minimum 20 Plates", title: "Minimum 20 Plates - Rs. 3,000" },
-    { id: "SERVICE_Additional Plates", title: "Additional Plates (Above 30)" },
-    { id: "SERVICE_Inverter Repair", title: "Inverter Repair (Inspection)" },
-    { id: "SERVICE_Solar Installation", title: "Solar Installation (Inspection)" },
-    { id: "SERVICE_Visit Charges", title: "Visit Charges - Rs. 1,000" },
+    { id: "SERVICE_20 Plates Service", title: "20 Plates - Rs. 3,000" },
+    { id: "SERVICE_Extra Plates", title: "Extra Plates - Rs.100/plate" },
+    { id: "SERVICE_Inverter Repair", title: "Inverter Repair" },
+    { id: "SERVICE_Solar Installation", title: "Solar Installation" },
   ]);
 }
 
-// ================= SEND LIST =================
+// ================= HELPERS =================
+
 async function sendList(to, text, rows) {
   await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
     method: "POST",
@@ -199,7 +161,6 @@ async function sendList(to, text, rows) {
   });
 }
 
-// ================= SEND TEXT =================
 async function sendMessage(to, body) {
   await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
     method: "POST",
@@ -219,5 +180,5 @@ async function sendMessage(to, body) {
 // ================= SERVER =================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () =>
-  console.log(`🚀 WhatsApp bot running on port ${PORT}`)
+  console.log(`🚀 WhatsApp bot running on ${PORT}`)
 );
