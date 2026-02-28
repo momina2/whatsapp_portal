@@ -4,65 +4,64 @@ import fetch from "node-fetch";
 const app = express();
 app.use(express.json());
 
+// ENV VARIABLES
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
-
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
-async function sendMessage(to, text) {
-  const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
-
-  await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to,
-      text: { body: text },
-    }),
-  });
-}
-
-// Webhook verification (Meta calls this)
+// ✅ Webhook verification (Meta ke liye)
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
+    console.log("Webhook verified");
     return res.status(200).send(challenge);
   }
   return res.sendStatus(403);
 });
 
-// Receive WhatsApp messages
+// ✅ Receive message + auto reply
 app.post("/webhook", async (req, res) => {
-  console.log("Incoming message:");
-  console.log(JSON.stringify(req.body, null, 2));
-
   try {
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
     const message = value?.messages?.[0];
 
-    if (!message) {
-      return res.sendStatus(200);
+    if (message && message.text) {
+      const from = message.from;
+      const userText = message.text.body;
+
+      console.log("User said:", userText);
+
+      // 👉 AUTO REPLY TEXT
+      let replyText = "Hello 👋\nThanks for messaging us!\nHow can I help you today? 😊";
+
+      if (userText.toLowerCase() === "hi") {
+        replyText = "Hi 👋\nWelcome to KaamSetHai 💼\nPlease tell us what service you need.";
+      }
+
+      // 🔥 Send reply to WhatsApp
+      await fetch(
+        `https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: from,
+            text: { body: replyText },
+          }),
+        }
+      );
+
+      console.log("Auto reply sent");
     }
-
-    const from = message.from;
-    const text = message.text?.body;
-
-    console.log("User said:", text);
-
-    // ✅ AUTO REPLY
-    await sendMessage(
-      from,
-      "Hello 👋\nThanks for messaging KaamSetHai.\nPlease reply with:\n1️⃣ AC Service\n2️⃣ Plumbing\n3️⃣ Electrician"
-    );
 
     res.sendStatus(200);
   } catch (error) {
@@ -71,7 +70,8 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+// ✅ Server start
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
